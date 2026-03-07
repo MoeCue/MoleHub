@@ -1,0 +1,15 @@
+{
+  "paths": {
+    "projectDir": "Apps",
+    "scriptDir": "AppScript",
+    "scriptSrcDir": "AppScriptSrc",
+    "injectScriptDir": "AppScripts"
+  },
+  "managerUrl": "http://localhost",
+  "managerPort": 3000,
+  "apps": {},
+  "newAppDefaults": {
+    "tailwindVersion": "3.4.17",
+    "dependencies": "lucide-react clsx tailwind-merge framer-motion"
+  }
+}

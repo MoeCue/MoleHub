@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "express": { "enabled": true, "desc": "Web服务器核心" },
+    "body-parser": { "enabled": true, "desc": "解析请求体" },
+    "cors": { "enabled": true, "desc": "跨域支持" },
+    "open": { "enabled": true, "version": "8.4.2", "desc": "自动打开浏览器" },
+    "xlsx": { "enabled": true, "desc": "Excel导出功能" }
+  }
+}

@@ -1,0 +1,7 @@
+# Workspace dependencies
+AppWorkspace/node_modules/
+AppWorkspace/AppManager/node_modules/
+AppWorkspace/tools/node_modules/
+AppWorkspace/Apps/*
+AppWorkspace/Logs/
+AppWorkspace/pnpm-lock.yaml

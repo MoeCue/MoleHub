@@ -1,0 +1,821 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoleHub - App控制中心</title>
+    <link href="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script defer src="https://cdn.staticfile.org/alpinejs/3.13.5/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .glass-panel {
+            background-color: rgba(31, 41, 55, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(75, 85, 99, 0.4);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+        .group-link:hover svg { transform: translate(2px, -2px); }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-6 font-sans antialiased selection:bg-blue-500 selection:text-white" x-data="appManager()" x-init="init()">
+
+    <div class="max-w-7xl mx-auto mb-8 flex justify-between items-center glass-panel rounded-xl px-6 py-4 sticky top-4 z-50">
+        <div class="flex items-center space-x-4">
+            <div class="p-2 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold text-white tracking-wide">MoleHub - App控制中心</h1>
+                <p class="text-gray-400 text-xs tracking-wider uppercase">Local Development Environment</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <button @click="openManagerLogTab()" class="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2.5 rounded-lg shadow transition">
+                <span class="font-medium text-sm">查看总控制台Log</span>
+            </button>
+            <button @click="clearAllLogs()" class="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2.5 rounded-lg shadow transition">
+                <span class="font-medium text-sm">清理所有日志</span>
+            </button>
+            <button @click="openModal()" class="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg shadow-lg transition transform active:scale-95 focus:outline-none ring-2 ring-blue-500 ring-opacity-50">
+                <span class="text-lg leading-none font-bold">+</span>
+                <span class="font-medium">新建项目</span>
+            </button>
+        </div>
+    </div>
+
+    <div x-show="statusMessage" x-cloak class="max-w-7xl mx-auto mb-4 px-4 py-3 rounded-lg border border-blue-700 bg-blue-900 text-blue-100 text-sm">
+        <span x-text="statusMessage"></span>
+    </div>
+
+    <div x-show="!isConsoleConnected" x-cloak class="max-w-7xl mx-auto mb-4 px-4 py-3 rounded-lg border border-red-700 bg-red-900 text-red-100 text-sm flex items-center justify-between">
+        <span x-text="connectError || '连接控制台失败，请确认 Manager.bat 已启动。'"></span>
+        <button @click="loadApps()" class="ml-4 px-3 py-1.5 bg-red-700 hover:bg-red-600 rounded text-xs">重试连接</button>
+    </div>
+
+    <div x-show="loading" class="flex flex-col items-center justify-center py-32 text-gray-500">
+        <svg class="animate-spin h-10 w-10 text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        <p class="animate-pulse">正在连接控制台...</p>
+    </div>
+
+    <div x-show="!loading" x-cloak class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-10">
+        <template x-for="(config, name) in apps" :key="name">
+            <div class="glass-panel rounded-xl p-6 relative group hover:border-blue-500/50 transition duration-300 flex flex-col h-full hover:bg-gray-800">
+                <div class="flex justify-between items-start mb-4 gap-2">
+                    <h2 class="text-xl font-bold text-white truncate flex-1" x-text="config.displayName || name"></h2>
+                    <div class="flex items-center gap-2">
+                        <button @click="openLogTab(name)" class="text-gray-400 hover:text-white transition p-1.5 bg-gray-800 rounded-md hover:bg-blue-600" title="查看日志">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        </button>
+                        <button @click="openModal(name, config)" class="text-gray-400 hover:text-white transition p-1.5 bg-gray-800 rounded-md hover:bg-blue-600" title="编辑配置">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        </button>
+                        <a :href="`http://localhost:${config.port}`" target="_blank" class="flex items-center space-x-1 bg-gray-800 hover:bg-blue-600 border border-gray-600 hover:border-blue-500 text-blue-300 hover:text-white px-2 py-1 rounded text-xs transition group-link shadow-sm">
+                            <span class="font-mono" x-text="config.port"></span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="mb-5 text-sm">
+                    <div class="text-gray-500 mb-1 text-xs uppercase font-bold tracking-wider">注入脚本</div>
+                    <div class="flex items-center p-2 rounded bg-gray-800/50 border border-gray-700/50">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-yellow-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        <span x-text="config.script || '无（默认模板）'" :class="config.script ? 'text-yellow-400 font-medium' : 'text-gray-500 italic'"></span>
+                    </div>
+                </div>
+
+                <div class="mb-6 flex-grow">
+                    <div class="text-gray-500 mb-2 text-xs uppercase font-bold tracking-wider">依赖包</div>
+                    <div class="flex flex-wrap gap-2 content-start">
+                        <template x-for="dep in (config.dependencies || '').split(' ').filter(Boolean)" :key="dep">
+                            <span class="bg-gray-800 border border-gray-600 text-gray-300 text-xs px-2 py-1 rounded select-none" x-text="dep"></span>
+                        </template>
+                        <span x-show="!config.dependencies" class="text-gray-600 text-xs italic">无额外依赖</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 pt-5 border-t border-gray-700/50 mt-auto">
+                    <button @click="runSetup(name)" :disabled="!!setupLoading[name]" class="flex items-center justify-center bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed text-gray-200 py-2.5 rounded-lg text-sm transition font-medium group-hover:bg-gray-600 border border-transparent hover:border-gray-500">
+                        <svg x-show="setupLoading[name]" x-cloak class="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        <span x-text="setupLoading[name] ? '修复中...' : '安装/修复'"></span>
+                    </button>
+                    <button @click="toggleApp(name)" :disabled="!!startLoading[name]" :class="appRunning[name] ? 'bg-red-700 hover:bg-red-600 disabled:bg-red-900' : 'bg-green-600 hover:bg-green-500 disabled:bg-green-900'" class="flex items-center justify-center disabled:cursor-not-allowed text-white py-2.5 rounded-lg text-sm transition font-bold shadow-lg hover:-translate-y-0.5">
+                        <svg x-show="startLoading[name]" x-cloak class="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                        <span x-text="startLoading[name] ? (actionState[name] === 'stop' ? '停止中...' : '启动中...') : (appRunning[name] ? '停止 APP' : '启动 APP')"></span>
+                    </button>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <div x-show="showModal" x-cloak class="fixed inset-0 bg-black bg-opacity-90 backdrop-blur-sm flex items-center justify-center transition-opacity duration-300" style="z-index: 9000;">
+        <div class="glass-panel w-full max-w-lg rounded-xl shadow-2xl border border-gray-700 overflow-hidden transform transition-all duration-300" @click.away="showModal = false"
+             x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100">
+            <div class="px-6 py-4 border-b border-gray-700 bg-gray-800 bg-opacity-80 flex justify-between items-center">
+                <h3 class="text-xl font-bold text-white" x-text="isEdit ? '编辑配置' : '新建项目'"></h3>
+                <button @click="showModal = false" class="text-gray-400 hover:text-white">&times;</button>
+            </div>
+
+            <div class="p-6 space-y-5">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">项目名称</label>
+                    <input type="text" x-model="form.name" @input="form.name = normalizeAppName(form.name)" :disabled="isEdit" class="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none disabled:opacity-50">
+                    <p class="mt-1 text-xs text-gray-500">仅支持小写字母、数字、短横线（例如：my-app-1）</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">APP名称（显示名）</label>
+                    <input type="text" x-model="form.displayName" class="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none" placeholder="例如：图片识别工具">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">端口（自动递增）</label>
+                        <input type="number" x-model="form.port" class="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider">Tailwind Ver</label>
+                        <select x-model="form.twVersion" class="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none">
+                            <option value="3.4.17">v3.4.17 (推荐)</option>
+                            <option value="latest">Latest</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-wider flex justify-between">
+                        <span>选择注入脚本</span>
+                        <span class="text-blue-400 cursor-pointer hover:underline" @click="fetchScripts()">刷新列表</span>
+                    </label>
+                    <div class="relative">
+                        <select x-model="form.script" class="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none appearance-none">
+                            <option value="">-- 不使用脚本（默认）--</option>
+                            <template x-for="file in scriptFiles" :key="file">
+                                <option :value="file" x-text="file"></option>
+                            </template>
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-gray-400">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider">依赖包列表</label>
+                    <div class="bg-gray-900 border border-gray-600 rounded-lg p-3 min-h-[80px] flex flex-wrap gap-2 items-center" @click="$refs.depInput.focus()">
+                        <template x-for="(dep, index) in depList" :key="index">
+                            <span class="bg-blue-900 text-blue-200 text-sm px-2 py-1 rounded flex items-center gap-1 border border-blue-700">
+                                <span x-text="dep"></span>
+                                <button @click.stop="removeDep(index)" class="hover:text-white text-blue-400 focus:outline-none">&times;</button>
+                            </span>
+                        </template>
+                        <input x-ref="depInput" type="text" x-model="newDep" @keydown.enter.prevent="addDep()" @keydown.backspace="handleBackspace()"
+                               class="bg-transparent border-none outline-none text-white text-sm flex-grow min-w-[100px]" placeholder="输入包名按回车...">
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-6 py-4 bg-gray-800 bg-opacity-80 border-t border-gray-700 flex items-center justify-between">
+                <button x-show="isEdit" x-cloak @click="startUninstallFlow()" :disabled="uninstallLoading"
+                        class="px-5 py-2 bg-red-700 hover:bg-red-600 disabled:bg-red-900 disabled:cursor-not-allowed text-white rounded-lg shadow transition text-sm font-bold">
+                    <span x-show="!uninstallLoading">卸载App</span>
+                    <span x-show="uninstallLoading" x-cloak>卸载中...</span>
+                </button>
+                <div class="flex items-center space-x-3">
+                <button @click="showModal = false" class="px-5 py-2 text-gray-400 hover:text-white transition text-sm">取消</button>
+                <button @click="saveApp()" class="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg shadow-lg transition text-sm font-bold">保存配置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showStartSuccess" x-cloak class="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm flex items-center justify-center" style="z-index: 9999;">
+        <div class="glass-panel w-full max-w-md rounded-xl shadow-2xl border border-green-700 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-700 bg-gray-800 bg-opacity-80 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-green-300">启动成功</h3>
+                <button @click="showStartSuccess = false" class="text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <div class="p-6 space-y-4 text-sm">
+                <p>应用 <span class="font-semibold text-white" x-text="startedAppName"></span> 已发起启动。</p>
+                <div class="bg-gray-900 border border-gray-700 rounded p-3 break-all text-blue-300" x-text="startedAppUrl"></div>
+                <div class="flex justify-end gap-3">
+                    <button @click="showStartSuccess = false" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">关闭</button>
+                    <button @click="openStartedApp()" class="px-4 py-2 bg-green-600 hover:bg-green-500 rounded">打开页面</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showSetupSuccess" x-cloak class="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm flex items-center justify-center" style="z-index: 9999;">
+        <div class="glass-panel w-full max-w-md rounded-xl shadow-2xl border border-blue-700 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-700 bg-gray-800 bg-opacity-80 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-blue-300">安装/修复已启动</h3>
+                <button @click="showSetupSuccess = false" class="text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <div class="p-6 space-y-4 text-sm">
+                <p>应用 <span class="font-semibold text-white" x-text="setupAppName"></span> 正在安装/修复依赖。</p>
+                <p class="text-gray-300">你可以在日志页签查看实时输出。</p>
+                <div class="flex justify-end gap-3">
+                    <button @click="showSetupSuccess = false" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">关闭</button>
+                    <button @click="openLogTab(setupAppName); showSetupSuccess = false" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded">查看日志</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showUninstallModal" x-cloak class="fixed inset-0 bg-black bg-opacity-85 backdrop-blur-sm flex items-center justify-center" style="z-index: 9999;">
+        <div class="glass-panel w-full max-w-3xl rounded-xl shadow-2xl border border-red-700 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-700 bg-gray-800 bg-opacity-80 flex justify-between items-center">
+                <h3 class="text-lg font-bold text-red-300" x-text="`卸载 ${uninstallAppName}`"></h3>
+                <button @click="showUninstallModal = false" class="text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <div class="p-6 space-y-4 text-sm max-h-[65vh] overflow-auto">
+                <p class="text-gray-200">请选择要删除的路径/文件：</p>
+                <div>
+                    <div class="text-xs text-gray-400 mb-2 uppercase tracking-wider">运行与源码目录</div>
+                    <template x-for="(item, idx) in uninstallTargets" :key="`target-${idx}`">
+                        <label class="flex items-start gap-2 py-1.5">
+                            <input type="checkbox" x-model="item.checked" class="mt-1">
+                            <span class="font-mono text-xs break-all text-gray-200" x-text="item.path"></span>
+                        </label>
+                    </template>
+                    <p x-show="uninstallTargets.length===0" class="text-gray-500 italic">无</p>
+                </div>
+                <div>
+                    <div class="text-xs text-gray-400 mb-2 uppercase tracking-wider">后端文件（可选）</div>
+                    <template x-for="(item, idx) in uninstallBackendFiles" :key="`backend-${idx}`">
+                        <label class="flex items-start gap-2 py-1.5">
+                            <input type="checkbox" x-model="item.checked" class="mt-1">
+                            <span class="font-mono text-xs break-all text-gray-200" x-text="item.path"></span>
+                        </label>
+                    </template>
+                    <p x-show="uninstallBackendFiles.length===0" class="text-gray-500 italic">未识别到关联后端文件</p>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-700 bg-gray-800 bg-opacity-80 flex justify-end gap-3">
+                <button @click="showUninstallModal = false" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded">取消</button>
+                <button @click="confirmUninstall()" :disabled="uninstallLoading"
+                        class="px-4 py-2 bg-red-700 hover:bg-red-600 disabled:bg-red-900 rounded text-white font-bold">
+                    确认删除
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showLogPanel" x-cloak class="max-w-7xl mx-auto pb-10 relative z-10">
+        <div class="glass-panel rounded-xl border border-gray-700 overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-700 bg-gray-800 bg-opacity-80 flex justify-between items-center gap-3">
+                <div class="flex items-center gap-2 overflow-x-auto">
+                    <div class="flex items-center rounded border" :class="activeLogTab === '__manager__' ? 'bg-blue-700 border-blue-500' : 'bg-gray-800 border-gray-600'">
+                        <button @click="activeLogTab = '__manager__'; refreshActiveLog()" class="px-3 py-1.5 text-xs whitespace-nowrap">总控制台</button>
+                    </div>
+                    <template x-for="tab in logTabs.filter(x => x.appName !== '__manager__')" :key="tab.appName">
+                        <div class="flex items-center rounded border" :class="activeLogTab === tab.appName ? 'bg-blue-700 border-blue-500' : 'bg-gray-800 border-gray-600'">
+                            <button @click="activeLogTab = tab.appName; refreshActiveLog()" class="px-3 py-1.5 text-xs whitespace-nowrap" x-text="tab.appName"></button>
+                            <button @click="closeLogTab(tab.appName)" class="px-2 py-1.5 text-xs hover:bg-red-600">×</button>
+                        </div>
+                    </template>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button @click="refreshActiveLog()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs">刷新</button>
+                    <button @click="closeAllLogs()" class="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs">关闭日志</button>
+                </div>
+            </div>
+            <div class="p-4" x-show="activeLog()">
+                <div class="text-xs text-gray-400 mb-3">
+                    <span x-text="`文件: ${activeLog()?.file || '无'}`"></span>
+                    <span class="ml-4" x-text="`更新时间: ${activeLog()?.updatedAt || '-'}`"></span>
+                </div>
+                <pre class="bg-gray-900 border border-gray-700 rounded p-4 text-xs text-gray-200 overflow-auto h-[380px]" x-text="activeLog()?.content || '暂无日志'"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function appManager() {
+            return {
+                apps: {},
+                loading: true,
+                showModal: false,
+                isEdit: false,
+                scriptFiles: [],
+                depList: [],
+                newDep: '',
+                newAppDefaults: { tailwindVersion: '3.4.17', dependencies: 'lucide-react clsx tailwind-merge framer-motion xlsx' },
+                form: { name: '', port: 5173, twVersion: '3.4.17', script: '', deps: '', displayName: '' },
+                statusMessage: '',
+                isConsoleConnected: true,
+                connectError: '',
+                reconnectTimer: null,
+                isLoadingApps: false,
+                setupLoading: {},
+                uninstallLoading: false,
+                showUninstallModal: false,
+                uninstallAppName: '',
+                uninstallTargets: [],
+                uninstallBackendFiles: [],
+                appRunning: {},
+                startLoading: {},
+                actionState: {},
+                showSetupSuccess: false,
+                setupAppName: '',
+                showStartSuccess: false,
+                startedAppName: '',
+                startedAppUrl: '',
+                showLogPanel: false,
+                logTabs: [],
+                activeLogTab: '',
+                logPollTimer: null,
+
+                init() {
+                    this.fetchScripts();
+                    this.loadApps();
+                    this.openManagerLogTab();
+                },
+
+                async fetchJson(url, options = {}, timeoutMs = 8000) {
+                    const controller = new AbortController();
+                    const timer = setTimeout(() => controller.abort(), timeoutMs);
+                    try {
+                        const res = await fetch(url, { ...options, signal: controller.signal });
+                        const text = await res.text();
+                        const data = text ? JSON.parse(text) : {};
+                        if (!res.ok) {
+                            throw new Error(data.error || `HTTP ${res.status}`);
+                        }
+                        return data;
+                    } catch (e) {
+                        if (e && (e.name === 'AbortError' || String(e.message || '').includes('signal is aborted'))) {
+                            throw new Error('请求超时，请稍后查看日志或重试');
+                        }
+                        throw e;
+                    } finally {
+                        clearTimeout(timer);
+                    }
+                },
+
+                async loadApps({ silent = false } = {}) {
+                    if (this.isLoadingApps) return;
+                    this.isLoadingApps = true;
+                    if (!silent) this.loading = true;
+                    try {
+                        const data = await this.fetchJson('/api/apps');
+                        this.apps = data.apps || {};
+                        const defaults = data.newAppDefaults || {};
+                        this.newAppDefaults = {
+                            tailwindVersion: defaults.tailwindVersion || '3.4.17',
+                            dependencies: defaults.dependencies || 'lucide-react clsx tailwind-merge framer-motion xlsx'
+                        };
+                        await this.refreshAppStatus();
+                        this.isConsoleConnected = true;
+                        this.connectError = '';
+                        if (this.reconnectTimer) {
+                            clearInterval(this.reconnectTimer);
+                            this.reconnectTimer = null;
+                        }
+                    } catch (e) {
+                        this.isConsoleConnected = false;
+                        this.connectError = `连接失败：${e.message}`;
+                        if (!this.reconnectTimer) {
+                            this.reconnectTimer = setInterval(() => this.loadApps({ silent: true }), 3000);
+                        }
+                    } finally {
+                        this.loading = false;
+                        this.isLoadingApps = false;
+                    }
+                },
+                async refreshAppStatus() {
+                    try {
+                        const data = await this.fetchJson('/api/apps/status', {}, 5000);
+                        this.appRunning = data.running || {};
+                    } catch (_) {
+                        const fallback = {};
+                        Object.keys(this.apps || {}).forEach((name) => fallback[name] = false);
+                        this.appRunning = fallback;
+                    }
+                },
+
+                async fetchScripts() {
+                    try {
+                        const data = await this.fetchJson('/api/scripts');
+                        this.scriptFiles = data.files || [];
+                    } catch (e) {
+                        this.statusMessage = `获取脚本列表失败：${e.message}`;
+                    }
+                },
+
+                openModal(name = '', config = null) {
+                    this.isEdit = !!name;
+                    this.uninstallLoading = false;
+                    this.showUninstallModal = false;
+                    this.uninstallAppName = '';
+                    this.uninstallTargets = [];
+                    this.uninstallBackendFiles = [];
+                    this.fetchScripts();
+
+                    if (name && config) {
+                        this.form = {
+                            name,
+                            port: config.port,
+                            twVersion: config.tailwindVersion,
+                            script: config.script || '',
+                            deps: config.dependencies || '',
+                            displayName: config.displayName || ''
+                        };
+                    } else {
+                        const existingPorts = Object.values(this.apps).map(app => parseInt(app.port) || 0);
+                        const maxPort = existingPorts.length > 0 ? Math.max(...existingPorts) : 5172;
+                        this.form = {
+                            name: '',
+                            port: maxPort + 1,
+                            twVersion: this.newAppDefaults.tailwindVersion || '3.4.17',
+                            script: '',
+                            deps: this.newAppDefaults.dependencies || '',
+                            displayName: ''
+                        };
+                    }
+
+                    this.depList = this.form.deps.split(' ').filter(Boolean);
+                    this.newDep = '';
+                    this.showModal = true;
+                },
+
+                addDep() {
+                    const val = this.newDep.trim();
+                    if (val && !this.depList.includes(val)) this.depList.push(val);
+                    this.newDep = '';
+                },
+
+                removeDep(index) {
+                    this.depList.splice(index, 1);
+                },
+
+                handleBackspace() {
+                    if (this.newDep === '' && this.depList.length > 0) this.depList.pop();
+                },
+
+                normalizeAppName(name) {
+                    return String(name || '')
+                        .toLowerCase()
+                        .replace(/[^a-z0-9-]/g, '')
+                        .replace(/-+/g, '-')
+                        .replace(/^-+/, '');
+                },
+
+                async saveApp() {
+                    this.form.name = this.normalizeAppName(this.form.name);
+                    if (!this.form.name) {
+                        this.statusMessage = '请输入项目名';
+                        return;
+                    }
+                    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(this.form.name)) {
+                        this.statusMessage = '项目名格式不合法：仅支持小写字母、数字、短横线，且不能以短横线结尾';
+                        return;
+                    }
+
+                    const payload = {
+                        appName: this.form.name,
+                        config: {
+                            port: parseInt(this.form.port, 10),
+                            tailwindVersion: this.form.twVersion,
+                            script: this.form.script || null,
+                            dependencies: this.depList.join(' '),
+                            displayName: this.form.displayName || ''
+                        }
+                    };
+
+                    try {
+                        await this.fetchJson('/api/save', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        this.showModal = false;
+                        this.statusMessage = '配置已保存';
+                        this.loadApps();
+                    } catch (e) {
+                        this.statusMessage = `保存失败：${e.message}`;
+                    }
+                },
+
+                async startUninstallFlow() {
+                    if (!this.isEdit || !this.form.name) return;
+                    if (this.uninstallLoading) return;
+                    const appName = this.form.name;
+                    if (this.appRunning[appName]) {
+                        this.statusMessage = '正在运行，请先停止App';
+                        window.alert('正在运行，请先停止App');
+                        return;
+                    }
+
+                    this.uninstallLoading = true;
+                    this.statusMessage = `正在检查卸载项：${appName}`;
+                    try {
+                        const preview = await this.fetchJson('/api/uninstall/preview', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ appName })
+                        });
+
+                        if (preview.running) {
+                            this.statusMessage = '正在运行，请先停止App';
+                            window.alert('正在运行，请先停止App');
+                            return;
+                        }
+
+                        this.uninstallAppName = appName;
+                        this.uninstallTargets = (preview.targets || []).map((p) => ({ path: p, checked: true }));
+                        this.uninstallBackendFiles = (preview.backendFiles || []).map((p) => ({ path: p, checked: false }));
+                        this.showUninstallModal = true;
+                        if (preview.missing && preview.missing.length > 0) {
+                            this.statusMessage = `提示：有 ${preview.missing.length} 个路径不存在，卸载时会自动跳过`;
+                        } else {
+                            this.statusMessage = `已载入卸载清单：${appName}`;
+                        }
+                    } catch (e) {
+                        if (String(e.message || '').includes('正在运行，请先停止App')) {
+                            window.alert('正在运行，请先停止App');
+                        }
+                        this.statusMessage = `卸载失败：${e.message}`;
+                    } finally {
+                        this.uninstallLoading = false;
+                    }
+                },
+
+                async confirmUninstall() {
+                    if (this.uninstallLoading) return;
+                    const appName = this.uninstallAppName;
+                    const selected = [
+                        ...this.uninstallTargets.filter(x => x.checked).map(x => x.path),
+                        ...this.uninstallBackendFiles.filter(x => x.checked).map(x => x.path)
+                    ];
+                    if (selected.length === 0) {
+                        this.statusMessage = '请至少选择一个删除项';
+                        return;
+                    }
+
+                    this.uninstallLoading = true;
+                    try {
+                        this.statusMessage = `正在卸载 ${appName}`;
+                        const result = await this.fetchJson('/api/uninstall', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ appName, targets: selected })
+                        }, 20000);
+
+                        this.showUninstallModal = false;
+                        this.showModal = false;
+                        this.statusMessage = `卸载完成：${appName}（删除 ${result.deleted ? result.deleted.length : 0} 项）`;
+                        this.closeLogTab(appName);
+                        await this.loadApps({ silent: true });
+                    } catch (e) {
+                        this.statusMessage = `卸载失败：${e.message}`;
+                    } finally {
+                        this.uninstallLoading = false;
+                    }
+                },
+
+                async runSetup(name) {
+                    if (this.setupLoading[name]) return;
+                    this.setupLoading[name] = true;
+                    try {
+                        const preview = await this.fetchJson('/api/setup/preview', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ appName: name })
+                        });
+
+                        const lines = [];
+                        lines.push(`应用: ${name}`);
+                        lines.push(`项目路径: ${preview.projectPath}`);
+                        lines.push('');
+                        if (!preview.toInstall || preview.toInstall.length === 0) {
+                            lines.push('未检测到新增依赖。');
+                        } else {
+                            lines.push(`本次预计安装 ${preview.total} 个依赖：`);
+                            preview.toInstall.forEach((item) => {
+                                const tag = item.section === 'devDependencies' ? 'dev' : 'dep';
+                                lines.push(`- [${tag}] ${item.name}`);
+                            });
+                        }
+                        lines.push('');
+                        lines.push('确认后将开始安装/修复。是否继续？');
+
+                        if (!window.confirm(lines.join('\n'))) return;
+
+                        const setupData = await this.fetchJson('/api/setup', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ appName: name })
+                        });
+
+                        this.statusMessage = `已启动安装/修复：${name}`;
+                        this.setupAppName = name;
+                        this.showSetupSuccess = true;
+                        this.openLogTab(name);
+                        if (setupData.logFile) {
+                            const tab = this.activeLog();
+                            if (tab) tab.file = setupData.logFile;
+                        }
+                    } catch (e) {
+                        this.statusMessage = `安装失败：${e.message}`;
+                    } finally {
+                        this.setupLoading[name] = false;
+                    }
+                },
+
+                async runStart(name) {
+                    if (this.startLoading[name]) return;
+                    this.startLoading[name] = true;
+                    this.actionState[name] = 'start';
+
+                    try {
+                        const data = await this.fetchJson('/api/start', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ appName: name })
+                        }, 30000);
+
+                        const port = data.port || this.apps[name]?.port || 5173;
+                        this.startedAppName = name;
+                        this.startedAppUrl = data.url || `http://localhost:${port}`;
+                        this.showStartSuccess = true;
+                        this.statusMessage = data.alreadyRunning
+                            ? `应用已在运行：${name} (${this.startedAppUrl})`
+                            : `已发起启动：${name}`;
+                        this.appRunning[name] = true;
+
+                        this.openLogTab(name);
+                        if (data.logFile) {
+                            const tab = this.activeLog();
+                            if (tab) tab.file = data.logFile;
+                        }
+                    } catch (e) {
+                        if (String(e.message || '').includes('端口被占用')) {
+                            alert('被其他进程占用，请修改端口号重试');
+                        }
+                        this.statusMessage = `启动失败：${e.message}`;
+                    } finally {
+                        this.startLoading[name] = false;
+                        this.actionState[name] = '';
+                    }
+                },
+                async toggleApp(name) {
+                    if (this.appRunning[name]) {
+                        await this.runStop(name);
+                        return;
+                    }
+                    await this.runStart(name);
+                },
+                async runStop(name) {
+                    if (this.startLoading[name]) return;
+                    this.startLoading[name] = true;
+                    this.actionState[name] = 'stop';
+                    try {
+                        const data = await this.fetchJson('/api/stop', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ appName: name })
+                        });
+                        if (data.stopped > 0) {
+                            this.statusMessage = `已停止 ${name}，关闭进程 ${data.stopped} 个（端口 ${data.port}）`;
+                        } else {
+                            this.statusMessage = `应用未运行：${name}（端口 ${data.port}）`;
+                        }
+                        if (data.released === true || (data.stopped || 0) > 0) {
+                            this.appRunning[name] = false;
+                        }
+                        this.openLogTab(name);
+                        if (data.logFile) {
+                            const tab = this.activeLog();
+                            if (tab) tab.file = data.logFile;
+                        }
+                        await this.refreshAppStatus();
+                    } catch (e) {
+                        this.statusMessage = `停止失败：${e.message}`;
+                        await this.refreshAppStatus();
+                    } finally {
+                        this.startLoading[name] = false;
+                        this.actionState[name] = '';
+                    }
+                },
+
+                openStartedApp() {
+                    if (!this.startedAppUrl) return;
+                    window.open(this.startedAppUrl, '_blank');
+                    this.showStartSuccess = false;
+                },
+
+                activeLog() {
+                    if (this.activeLogTab === '__manager__') {
+                        let tab = this.logTabs.find((x) => x.appName === '__manager__');
+                        if (!tab) {
+                            tab = { appName: '__manager__', file: 'manager-console', updatedAt: '', content: '' };
+                            this.logTabs.unshift(tab);
+                        }
+                        return tab;
+                    }
+                    return this.logTabs.find((x) => x.appName === this.activeLogTab) || null;
+                },
+
+                openManagerLogTab() {
+                    this.showLogPanel = true;
+                    this.activeLogTab = '__manager__';
+                    this.refreshActiveLog();
+                    this.startLogPolling();
+                },
+
+                openLogTab(appName) {
+                    let tab = this.logTabs.find((x) => x.appName === appName);
+                    if (!tab) {
+                        tab = {
+                            appName,
+                            file: '',
+                            updatedAt: '',
+                            content: '日志加载中...'
+                        };
+                        this.logTabs.push(tab);
+                    }
+                    this.activeLogTab = appName;
+                    this.showLogPanel = true;
+                    this.refreshActiveLog();
+                    this.startLogPolling();
+                },
+
+                closeLogTab(appName) {
+                    this.logTabs = this.logTabs.filter((x) => x.appName !== appName);
+                    if (this.activeLogTab === appName) {
+                        this.activeLogTab = this.logTabs.length ? this.logTabs[this.logTabs.length - 1].appName : '';
+                    }
+                    if (!this.logTabs.length) {
+                        this.closeAllLogs();
+                    } else {
+                        this.refreshActiveLog();
+                    }
+                },
+
+                closeAllLogs() {
+                    this.showLogPanel = false;
+                    this.logTabs = [];
+                    this.activeLogTab = '';
+                    this.stopLogPolling();
+                },
+
+                startLogPolling() {
+                    if (this.logPollTimer) return;
+                    this.logPollTimer = setInterval(() => {
+                        if (this.activeLogTab) {
+                            this.refreshActiveLog({ silent: true });
+                        }
+                    }, 2000);
+                },
+
+                stopLogPolling() {
+                    if (this.logPollTimer) {
+                        clearInterval(this.logPollTimer);
+                        this.logPollTimer = null;
+                    }
+                },
+
+                async refreshActiveLog({ silent = false } = {}) {
+                    const tab = this.activeLog();
+                    if (!tab) return;
+
+                    if (!silent) tab.content = '日志加载中...';
+                    try {
+                        if (tab.appName === '__manager__') {
+                            const data = await this.fetchJson('/api/logs/manager', {}, 5000);
+                            tab.file = 'manager-console';
+                            tab.updatedAt = new Date().toISOString();
+                            tab.content = data.content || '暂无日志';
+                        } else {
+                            const data = await this.fetchJson(`/api/logs/latest?appName=${encodeURIComponent(tab.appName)}`);
+                            tab.file = data.file || '';
+                            tab.updatedAt = data.updatedAt || '';
+                            tab.content = data.content || '暂无日志';
+                        }
+                    } catch (e) {
+                        tab.content = `读取日志失败：${e.message}`;
+                    }
+                },
+                async clearAllLogs() {
+                    try {
+                        const data = await this.fetchJson('/api/logs/clear', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        this.statusMessage = `日志已清理：${data.deleted || 0} 个文件`;
+                        this.closeAllLogs();
+                        this.openManagerLogTab();
+                    } catch (e) {
+                        this.statusMessage = `清理日志失败：${e.message}`;
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

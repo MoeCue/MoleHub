@@ -1,0 +1,12 @@
+{
+  "name": "geminiapps-tools",
+  "private": true,
+  "version": "1.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "build:appscript": "node build-appscript.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.10"
+  }
+}
